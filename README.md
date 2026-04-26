@@ -1,60 +1,205 @@
-# Biblioteca en Solana
+# 🎬 MediaChain Solana
 
-![banner](./images/banner-biblioteca.jpg)
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+Sistema de bitácora de medios desarrollado como **Solana Program** utilizando **Rust** y el framework **Anchor**.  
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+Este proyecto implementa un sistema **CRUD** para registrar y gestionar reseñas de contenido (películas, series, anime, etc.) directamente en blockchain, aplicando:
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+- 🔑 Program Derived Addresses (PDAs)  
+- ⚡ Optimización de memoria *On-Chain*  
+- 🔒 Seguridad basada en firmas  
 
-![fork](./images/fork.png)
+---
 
-## Importando el proyecto 
+## 📚 Descripción
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+**MediaChain Solana** simula una bitácora personal donde cada usuario puede:
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+- Crear su historial de medios  
+- Registrar reseñas de contenido  
+- Editar calificaciones y estado (visto/no visto)  
+- Eliminar reseñas  
+- Consultar su historial en blockchain  
 
-```url
-https://beta.solpg.io/
+---
+
+## 🧠 Arquitectura y Estructuras de Datos
+
+En Solana es necesario definir el tamaño de los datos para calcular correctamente la renta (*rent*).
+
+### 📦 PDA Principal: `BitacoraMedios`
+
+Cuenta raíz que almacena todas las reseñas del usuario.
+
+```rust
+#[account]
+#[derive(InitSpace)]
+pub struct BitacoraMedios {
+    pub owner: Pubkey,
+    #[max_len(40)]
+    pub nombre_usuario: String,
+    #[max_len(20)]
+    pub resenas: Vec<Resena>,
+}
 ```
 
-Lo que nos dará algo parecido a:
+---
 
-![url](./images/url.png)
+### 🧩 Estructura Interna: `Resena`
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+Cada reseña contiene:
 
-![pg](./images/pg.png)
+- `titulo (String)` → nombre del contenido  
+- `calificacion (u8)` → puntuación (ej. 1–10)  
+- `visto_completo (bool)` → indica si se terminó el contenido  
 
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
+```rust
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, PartialEq, Debug)]
+pub struct Resena {
+    #[max_len(40)]
+    pub titulo: String,
+    pub calificacion: u8,
+    pub visto_completo: bool,
+}
+```
 
-![import](./images/import.png)
+---
 
-## Preparacion del entorno
+## 🔒 Seguridad
 
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
+El contrato asegura que solo el propietario pueda modificar su bitácora:
 
-![playground1](./images/playground1.png)
+```rust
+require!(
+    bitacora.owner == ctx.accounts.owner.key(),
+    Errores::AccesoDenegado
+);
+```
 
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
+✔ Protege la información del usuario  
+✔ Evita modificaciones por terceros  
 
-![wallet](./images/wallet.png)
+---
 
-Como resultado se mostrará la siguiente información:
+## ⚙️ Funcionalidad (CRUD)
 
-![status](./images/status.png)
+### 🟢 Inicializar Bitácora
 
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
+Crea la cuenta principal usando:
 
-* En amarillo: la la dirección de la wallet conectada
+```rust
+[b"mediachain", owner.key().as_ref()]
+```
 
-* En azul: la cantidad de tokens en la wallet
+Inicializa:
+- Owner  
+- Nombre del usuario  
+- Lista vacía de reseñas  
 
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
+---
 
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
+### ➕ Agregar Reseña
 
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+- Recibe:
+  - título  
+  - calificación  
+  - estado (visto completo)  
+- Inserta en el vector con `.push()`  
+
+---
+
+### ✏️ Editar Reseña
+
+- Busca por `titulo`  
+- Actualiza:
+  - calificación  
+  - estado (`visto_completo`)  
+
+---
+
+### ❌ Eliminar Reseña
+
+```rust
+.iter().position(|r| r.titulo == titulo)
+```
+
+- Si existe → `.remove(index)`  
+- Si no → error `ResenaNoEncontrada`  
+
+---
+
+### 📖 Ver Bitácora
+
+```rust
+msg!("Historial de Reseñas: {:#?}", bitacora.resenas);
+```
+
+Muestra todas las reseñas en logs *On-Chain*
+
+---
+
+## 🧪 Despliegue en Solana Playground
+
+1. Copia el código en `lib.rs`  
+2. Ejecuta:
+
+```bash
+cargo clean
+```
+
+3. Haz clic en **Build**  
+4. Haz clic en **Deploy (Devnet)**  
+
+---
+
+## 🧑‍💻 Pruebas
+
+Puedes interactuar con el contrato usando:
+
+- Pestaña **Test** del Playground  
+- Scripts en TypeScript:
+
+```ts
+pg.program.methods...
+```
+
+Parámetros:
+- `titulo: String`  
+- `calificacion: u8`  
+- `visto_completo: bool`  
+
+---
+
+## ⚠️ Manejo de Errores
+
+```rust
+#[error_code]
+pub enum Errores {
+    #[msg("No tienes permisos para editar esta bitácora.")]
+    AccesoDenegado,
+    #[msg("La reseña buscada no existe en el registro.")]
+    ResenaNoEncontrada,
+}
+```
+
+---
+
+## 📌 Conclusión
+
+Este proyecto demuestra:
+
+- Gestión de datos personales en blockchain  
+- Seguridad mediante validación de firmas  
+- Uso eficiente de estructuras dinámicas  
+- Implementación de CRUD en un caso práctico (Media Tracker)  
+
+---
+
+## 🚀 Próximos pasos
+
+- Añadir categorías (película, serie, anime)  
+- Implementar promedio automático de calificaciones  
+- Integrar frontend tipo Letterboxd  
+- Compartir reseñas públicamente  
+
+---
